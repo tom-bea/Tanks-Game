@@ -19,6 +19,13 @@ public class TankMovement : MonoBehaviour
    private float m_OriginalPitch;
 
 
+   private bool m_CanMove;
+   public bool CanMove
+   {
+      get { return m_CanMove; }
+      set { m_CanMove = value; }
+   }
+
    private void Awake()
    {
       m_Rigidbody = GetComponent<Rigidbody>();
@@ -30,6 +37,7 @@ public class TankMovement : MonoBehaviour
       m_Rigidbody.isKinematic = false;
       m_MovementInputValue = 0f;
       m_TurnInputValue = 0f;
+      m_CanMove = true;
    }
 
 
@@ -54,7 +62,8 @@ public class TankMovement : MonoBehaviour
       m_MovementInputValue = Input.GetAxis(m_MovementAxisName);
       m_TurnInputValue = Input.GetAxis(m_TurnAxisName);
 
-      EngineAudio();
+      if (m_CanMove)
+         EngineAudio();
    }
 
 
@@ -84,9 +93,12 @@ public class TankMovement : MonoBehaviour
 
    private void FixedUpdate()
    {
-      // Move and turn the tank.
-      Move();
-      Turn();
+      if (m_CanMove)
+      {
+         // Move and turn the tank.
+         Move();
+         Turn();
+      }
    }
 
 

@@ -21,10 +21,36 @@ public class TankShooting : MonoBehaviour
    private bool m_Fired;
 
 
+
+
+   [Space(20)]
+
+   public Rigidbody m_BlackHoleShell;
+
+   [HideInInspector] public float m_PowerUpLength;
+   [HideInInspector] public PowerType m_PowerUpType;
+   
+   private float m_TimeLeftOnPowerUp;
+   private bool m_PowerUpActive;
+
+
+   private bool m_CanShoot;
+   public bool CanShoot
+   {
+      get { return m_CanShoot; }
+      set { m_CanShoot = value; }
+   }
+
+
    private void OnEnable()
    {
       m_CurrentLaunchForce = m_MinLaunchForce;
       m_AimSlider.value = m_MinLaunchForce;
+
+      m_TimeLeftOnPowerUp = 0;
+      m_PowerUpActive = false;
+
+      m_CanShoot = true;
    }
 
 
@@ -38,45 +64,69 @@ public class TankShooting : MonoBehaviour
 
    private void Update()
    {
-      // Track the current state of the fire button and make decisions based on the current launch force.
-      m_AimSlider.value = m_MinLaunchForce;
-
-      if (m_CurrentLaunchForce >= m_MaxLaunchForce && !m_Fired)
+      if (m_TimeLeftOnPowerUp > 0)
+         m_TimeLeftOnPowerUp -= Time.deltaTime;
+      else
       {
-         // at max charge, not fired
-         m_CurrentLaunchForce = m_MaxLaunchForce;
-         Fire();
+         m_PowerUpActive = false;
+         m_TimeLeftOnPowerUp = 0;
+         DeActivatePowerUp();
       }
-      else if (Input.GetButtonDown(m_FireButton))
-      {
-         // have we pressed fire for the first time??
-         m_Fired = false;
-         m_CurrentLaunchForce = m_MinLaunchForce;
 
-         m_ShootingAudio.clip = m_ChargingClip;
-         m_ShootingAudio.Play();
-      }
-      else if (Input.GetButton(m_FireButton) && !m_Fired)
+      if (m_CanShoot && !PauseMenu.GameIsPaused)
       {
-         // holding the fire button, not yet fired
-         m_CurrentLaunchForce += m_ChargeSpeed * Time.deltaTime;
+         // Track the current state of the fire button and make decisions based on the current launch force.
+         m_AimSlider.value = m_MinLaunchForce;
 
-         m_AimSlider.value = m_CurrentLaunchForce;
-      }
-      else if (Input.GetButtonUp(m_FireButton) && !m_Fired)
-      {
-         // we release the button, having not fired yet
-         Fire();
+
+         if (!m_PowerUpActive)
+         {
+            if (m_CurrentLaunchForce >= m_MaxLaunchForce && !m_Fired)
+            {
+               // at max charge, not fired
+               m_CurrentLaunchForce = m_MaxLaunchForce;
+               Fire(m_Shell);
+            }
+            else if (Input.GetButtonDown(m_FireButton))
+            {
+               // have we pressed fire for the first time??
+               m_Fired = false;
+               m_CurrentLaunchForce = m_MinLaunchForce;
+
+               m_ShootingAudio.clip = m_ChargingClip;
+               m_ShootingAudio.Play();
+            }
+            else if (Input.GetButton(m_FireButton) && !m_Fired)
+            {
+               // holding the fire button, not yet fired
+               m_CurrentLaunchForce += m_ChargeSpeed * Time.deltaTime;
+
+               m_AimSlider.value = m_CurrentLaunchForce;
+            }
+            else if (Input.GetButtonUp(m_FireButton) && !m_Fired)
+            {
+               // we release the button, having not fired yet
+               Fire(m_Shell);
+            }
+         }
+         else     // Using power up------------
+         {
+            if (m_CurrentLaunchForce > m_MinLaunchForce && m_PowerUpType != PowerType.Black_Hole)
+            {
+               Fire(m_Shell);
+            }
+            UsePowerUp();
+         }
       }
    }
 
 
-   private void Fire()
+   private void Fire(Rigidbody shell)
    {
       // Instantiate and launch the shell.
       m_Fired = true;
 
-      Rigidbody shellInstance = Instantiate(m_Shell, m_FireTransform.position, m_FireTransform.rotation) as Rigidbody;
+      Rigidbody shellInstance = Instantiate(shell, m_FireTransform.position, m_FireTransform.rotation) as Rigidbody;
 
       shellInstance.velocity = m_CurrentLaunchForce * m_FireTransform.forward;
 
@@ -85,4 +135,85 @@ public class TankShooting : MonoBehaviour
 
       m_CurrentLaunchForce = m_MinLaunchForce;
    }
+
+
+   public void ActivatePowerUp()
+   {
+      m_PowerUpActive = true;
+      m_TimeLeftOnPowerUp = m_PowerUpLength;
+   }
+
+   private void DeActivatePowerUp()
+   {
+      switch (m_PowerUpType)
+      {
+         case PowerType.Fire:
+            GetComponent<TankFlamethrower>().StopFiring(m_ShootingAudio);
+            break;
+         case PowerType.Black_Hole:
+            break;
+         case PowerType.Ice:
+            GetComponent<TankIceGun>().StopFiring();
+            break;
+         case PowerType.Lightning:
+            GetComponent<TankLightning>().StopFiring();
+            break;
+      }
+   }
+
+   private void UsePowerUp()
+   {
+      switch (m_PowerUpType)
+      {
+         case PowerType.Fire:
+            GetComponent<TankFlamethrower>().Fire(m_FireButton, m_ShootingAudio);
+            break;
+         case PowerType.Black_Hole:
+            // Track the current state of the fire button and make decisions based on the current launch force.
+            m_AimSlider.value = m_MinLaunchForce;
+
+            if (m_CurrentLaunchForce >= m_MaxLaunchForce && !m_Fired)
+            {
+               // at max charge, not fired
+               m_CurrentLaunchForce = m_MaxLaunchForce;
+               Fire(m_BlackHoleShell);
+            }
+            else if (Input.GetButtonDown(m_FireButton))
+            {
+               // have we pressed fire for the first time??
+               m_Fired = false;
+               m_CurrentLaunchForce = m_MinLaunchForce;
+
+               m_ShootingAudio.clip = m_ChargingClip;
+               m_ShootingAudio.Play();
+            }
+            else if (Input.GetButton(m_FireButton) && !m_Fired)
+            {
+               // holding the fire button, not yet fired
+               m_CurrentLaunchForce += m_ChargeSpeed * Time.deltaTime;
+
+               m_AimSlider.value = m_CurrentLaunchForce;
+            }
+            else if (Input.GetButtonUp(m_FireButton) && !m_Fired)
+            {
+               // we release the button, having not fired yet
+               Fire(m_BlackHoleShell);
+            }
+            break;
+         case PowerType.Ice:
+            GetComponent<TankIceGun>().Fire(m_FireButton);
+            break;
+         case PowerType.Lightning:
+            GetComponent<TankLightning>().Fire(m_FireButton);
+            break;
+      }
+   }
+}
+
+public enum PowerType
+{
+   Fire,
+   Black_Hole,
+   Ice,
+   Lightning
 }

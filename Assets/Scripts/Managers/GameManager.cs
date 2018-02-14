@@ -5,6 +5,12 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
+   public delegate void EmptyDelegate();
+   public static event EmptyDelegate StartRoundEvent;
+   public static event EmptyDelegate EndRoundEvent;
+
+
+
    public int m_NumRoundsToWin = 5;
    public float m_StartDelay = 3f;
    public float m_EndDelay = 3f;
@@ -21,6 +27,13 @@ public class GameManager : MonoBehaviour
    private TankManager m_GameWinner;
 
 
+   private static bool m_GameStoppedPillActive;
+   public static bool GameStoppedPillActive
+   {
+      get { return m_GameStoppedPillActive; }
+   }
+
+
    private void Start()
    {
       m_StartWait = new WaitForSeconds(m_StartDelay);
@@ -35,11 +48,47 @@ public class GameManager : MonoBehaviour
 
    private void SpawnAllTanks()
    {
+      DataKeeper dk = FindObjectOfType<DataKeeper>();
+      int tankColor = -1;
+
       for (int i = 0; i < m_Tanks.Length; i++)
       {
          m_Tanks[i].m_Instance =
              Instantiate(m_TankPrefab, m_Tanks[i].m_SpawnPoint.position, m_Tanks[i].m_SpawnPoint.rotation) as GameObject;
          m_Tanks[i].m_PlayerNumber = i + 1;
+         for (int j = 0; j < dk.m_ChosenTanks.Length; j++)
+         {
+            if (dk.m_ChosenTanks[j] == i + 1)
+            {
+               tankColor = j;
+               break;
+            }
+         }
+
+         switch (tankColor)
+         {
+            case 0:
+               m_Tanks[i].m_PlayerColor = Color.black;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpLength = 5;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpType = PowerType.Black_Hole;
+               break;
+            case 1:
+               m_Tanks[i].m_PlayerColor = Color.yellow;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpLength = 10;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpType = PowerType.Lightning;
+               break;
+            case 2:
+               m_Tanks[i].m_PlayerColor = Color.red;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpLength = 20;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpType = PowerType.Fire;
+               break;
+            case 3:
+               m_Tanks[i].m_PlayerColor = Color.blue;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpLength = 20;
+               m_Tanks[i].m_Instance.GetComponent<TankShooting>().m_PowerUpType = PowerType.Ice;
+               break;
+         }
+
          m_Tanks[i].Setup();
       }
    }
@@ -80,6 +129,8 @@ public class GameManager : MonoBehaviour
       ResetAllTanks();
       DisableTankControl();
 
+      m_GameStoppedPillActive = false;
+
       m_CameraControl.SetStartPositionAndSize();
 
       m_RoundNumber++;
@@ -93,12 +144,18 @@ public class GameManager : MonoBehaviour
    {
       EnableTankControl();
 
+      if (StartRoundEvent != null)
+         StartRoundEvent();
+
       m_MessageText.text = string.Empty;
 
       while (!OneTankLeft())
       {
          yield return null;
       }
+
+      if (EndRoundEvent != null)
+         EndRoundEvent();
    }
 
 
@@ -204,6 +261,43 @@ public class GameManager : MonoBehaviour
       for (int i = 0; i < m_Tanks.Length; i++)
       {
          m_Tanks[i].DisableControl();
+      }
+   }
+
+
+
+
+   private void OnEnable()
+   {
+      StopTimePill.ActivateStoppedTime += StopTime;
+   }
+
+   private void OnDisable()
+   {
+      StopTimePill.ActivateStoppedTime -= StopTime;
+   }
+
+   private void StopTime(int tankNumber, float effectLength)
+   {
+      Debug.Log(tankNumber);
+      m_GameStoppedPillActive = true;
+      for (int i = 0; i < m_Tanks.Length; i++)
+      {
+         if ((tankNumber - 1) != i)
+            m_Tanks[i].SetCanMove(false);
+         m_Tanks[i].SetCanShoot(false);
+      }
+
+      Invoke("ResumeTime", effectLength);
+   }
+   
+   private void ResumeTime()
+   {
+      m_GameStoppedPillActive = false;
+      for (int i = 0; i < m_Tanks.Length; i++)
+      {
+         m_Tanks[i].SetCanMove(true);
+         m_Tanks[i].SetCanShoot(true);
       }
    }
 }
